@@ -64,7 +64,8 @@ const elements = {
     cartCount:        document.getElementById('cart-count'),
     cartItems:        document.getElementById('cart-items'),
     totalAmount:      document.getElementById('total-amount'),
-    bottomNav:        document.getElementById('bottom-nav')
+    bottomNav:        document.getElementById('bottom-nav'),
+    btnCheckout:      document.getElementById('btn-checkout')
 };
 
 // =====================================================
@@ -200,6 +201,18 @@ elements.btnQtyMinus.addEventListener('click', () => {
 elements.btnQtyPlus.addEventListener('click', () => {
     currentScanQuantity++;
     elements.scanQuantity.innerText = currentScanQuantity;
+});
+elements.btnCheckout.addEventListener('click', () => {
+    if (cart.length === 0) {
+        alert('Sepetiniz boş!');
+        return;
+    }
+    const grand = cart.reduce((s, i) => s + (i.price * (i.quantity || 1)), 0);
+    alert(`Toplam tutar: ${grand.toFixed(2)} TL\nBizi tercih ettiğiniz için teşekkürler!`);
+    cart = [];
+    updateCartBadge();
+    renderCart();
+    showView('home');
 });
 
 // =====================================================
