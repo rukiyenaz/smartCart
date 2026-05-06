@@ -16,18 +16,45 @@ const mockData = [
 
 let productsData = [...mockData]; // Varsayılan olarak mockData ile başlat
 
-// Supabase'den ürünleri çek
+// metadata.csv'den ürünleri çek
 async function fetchProducts() {
     try {
-        const { data, error } = await supabaseClient.from('products').select('*');
-        if (error) {
-            console.error("Supabase ürün çekme hatası:", error);
-        } else if (data && data.length > 0) {
-            productsData = data;
-            console.log("Ürünler Supabase'den başarıyla çekildi:", productsData.length);
+        const response = await fetch('migros_dataset_merged/metadata.csv');
+        if (!response.ok) throw new Error('CSV dosyası bulunamadı');
+        
+        const csvText = await response.text();
+        const lines = csvText.split('\n');
+        const parsedProducts = [];
+        
+        // İlk satır başlıklar (name,safe_name,price,link,image,file)
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            
+            const columns = line.split(',');
+            // En az 6 sütun bekliyoruz (son sütun dosya adı)
+            if (columns.length >= 6) {
+                const name = columns[0];
+                const price = parseFloat(columns[2]);
+                const file = columns[columns.length - 1].trim();
+                
+                // Eğer fiyat geçerli bir sayıysa listeye ekle
+                if (!isNaN(price) && file) {
+                    parsedProducts.push({
+                        name: name,
+                        price: price,
+                        img: 'migros_dataset_merged/' + file
+                    });
+                }
+            }
+        }
+        
+        if (parsedProducts.length > 0) {
+            productsData = parsedProducts;
+            console.log("Ürünler metadata.csv'den başarıyla çekildi. Toplam ürün:", productsData.length);
         }
     } catch (err) {
-        console.error("Ürün çekilirken beklenmeyen hata:", err);
+        console.error("CSV çekilirken beklenmeyen hata, varsayılan liste kullanılıyor:", err);
     }
 }
 
