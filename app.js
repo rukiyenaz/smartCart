@@ -1,166 +1,30 @@
 // Supabase istemcisi auth.js'de tanımlandı (supabaseClient)
 
 // =====================================================
-// KAMERA & GEMİNİ GÖRÜNTÜ TANIMA SİSTEMİ
+// ÖRNEK ÜRÜN VERİSİ (Simülasyon)
 // =====================================================
-let cameraStream = null;
-let scanLoopActive = false;
-
-const videoEl   = document.getElementById('camera-feed');
-const cameraFallback = document.getElementById('camera-fallback');
-const scanStatusEl   = document.getElementById('scan-status');
-
-// Kamera başlat
-async function startCamera() {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
-        });
-        cameraStream = stream;
-        videoEl.srcObject = stream;
-        videoEl.style.display = 'block';
-        cameraFallback.style.display = 'none';
-        setScanStatus('📷 Ürünü vizöre getirin ve "Tara" butonuna basın');
-    } catch (err) {
-        console.warn('Kamera açılamadı:', err);
-        videoEl.style.display = 'none';
-        cameraFallback.style.display = 'flex';
-        setScanStatus('⚠️ Kamera erişimi reddedildi');
-    }
-}
-
-// Kamera durdur
-function stopCamera() {
-    scanLoopActive = false;
-    if (cameraStream) {
-        cameraStream.getTracks().forEach(t => t.stop());
-        cameraStream = null;
-    }
-    videoEl.srcObject = null;
-}
-
-// Durum metni
-function setScanStatus(msg, detecting = false) {
-    if (!scanStatusEl) return;
-    scanStatusEl.textContent = msg;
-    scanStatusEl.classList.toggle('detecting', detecting);
-}
-
-// Video'dan frame yakala → Base64 PNG döndür
-function captureFrame() {
-    const canvas = document.createElement('canvas');
-    canvas.width  = videoEl.videoWidth  || 640;
-    canvas.height = videoEl.videoHeight || 480;
-    canvas.getContext('2d').drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-    // base64'ten "data:image/png;base64," prefix'ini kaldır
-    return canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
-}
-
-// Gemini Vision API ile ürünü tanı
-async function recognizeProductWithGemini(base64Image) {
-    if (!GEMINI_KEY) {
-        setScanStatus('⚠️ Gemini API anahtarı eksik. config.js dosyasını doldurun.');
-        return null;
-    }
-
-    const prompt = `Bu bir market/süpermarket ürünü tarama uygulamasıdır.
-Görüntüdeki ürünü Türkçe olarak tanımla.
-Yanıt SADECE şu JSON formatında olsun, başka hiçbir şey yazma:
-{
-  "name": "Ürün adı (marka + ürün adı + boyut varsa)",
-  "category": "Kategori (örn: Atıştırmalık, İçecek, Temizlik vb.)",
-  "estimated_price_tl": 25.90
-}
-Eğer görüntüde belirgin bir market ürünü yoksa: {"name": null}`;
-
-    try {
-        const res = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [
-                            { text: prompt },
-                            { inline_data: { mime_type: 'image/jpeg', data: base64Image } }
-                        ]
-                    }],
-                    generationConfig: { temperature: 0.1, maxOutputTokens: 200 }
-                })
-            }
-        );
-
-        if (!res.ok) {
-            const err = await res.json();
-            console.error('Gemini API hatası:', err);
-            setScanStatus(`❌ API Hatası: ${err.error?.message || res.status}`);
-            return null;
-        }
-
-        const data = await res.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-        // JSON'u parse et
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) return null;
-        const parsed = JSON.parse(jsonMatch[0]);
-
-        if (!parsed.name) return null;
-        return {
-            name: parsed.name,
-            price: parsed.estimated_price_tl || parseFloat((Math.random() * 80 + 5).toFixed(2)),
-            img: '',   // Görüntü tanımada gerçek ürün görseli yok; frame'i kullanabiliriz
-            category: parsed.category || ''
-        };
-    } catch (e) {
-        console.error('Gemini parse hatası:', e);
-        setScanStatus('❌ Tanıma hatası, tekrar deneyin');
-        return null;
-    }
-}
-
-// "Tara" butonuna basıldığında çalışır
-async function triggerScan() {
-    if (!cameraStream) {
-        setScanStatus('⚠️ Kamera bağlı değil');
-        return;
-    }
-    if (currentProduct) return; // zaten bir ürün tespit edilmişse
-
-    elements.scanTrigger.disabled = true;
-    setScanStatus('🔍 Görüntü analiz ediliyor...', true);
-
-    // Vizör bölgesini yakala (ortadan kırp)
-    const base64 = captureFrame();
-
-    const product = await recognizeProductWithGemini(base64);
-
-    elements.scanTrigger.disabled = false;
-
-    if (product) {
-        // Görüntünün kendisini ürün görseli olarak kullan
-        const canvas = document.createElement('canvas');
-        canvas.width  = videoEl.videoWidth  || 640;
-        canvas.height = videoEl.videoHeight || 480;
-        canvas.getContext('2d').drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-        product.img = canvas.toDataURL('image/jpeg', 0.7);
-
-        currentProduct = product;
-        showDetection(product);
-    } else {
-        setScanStatus('❌ Ürün tanınamadı, tekrar deneyin');
-    }
-}
-
+const mockData = [
+    { name: "Biscolata Mood Bardak 125 G",          price: 56.00,  img: "migros_dataset_merged/snack_Biscolata Mood Bardak 125 G.jpg" },
+    { name: "Doritos Storm Flamin Hot 125 G",        price: 58.95,  img: "migros_dataset_merged/snack_Doritos Storm Flamin Hot Süper Boy 125 G.jpg" },
+    { name: "Eti Karam Gurme Bitter Gofret 50 G",   price: 29.95,  img: "migros_dataset_merged/snack_Eti Karam Gurme Bitter Çikolatalı Gofret 50 g.jpg" },
+    { name: "Tadelle Fındıklı Sütlü Çikolata 3x52G",price: 187.50, img: "migros_dataset_merged/snack_Tadelle Fındık Dolgulu Sütlü Çikolata 3 x 52 G.jpg" },
+    { name: "Eti Crax Çubuk Kraker 40 G",           price: 7.50,   img: "migros_dataset_merged/snack_Eti Crax Çubuk Kraker 40 G.jpg" },
+    { name: "Doritos Nacho Süper Boy 130 G",         price: 54.95,  img: "migros_dataset_merged/snack_Doritos Nacho Süper Boy 130 G.jpg" },
+    { name: "Kahve Dünyası Tambol Fındıklı 77 G",   price: 84.95,  img: "migros_dataset_merged/snack_Kahve Dünyası Tambol Fındıklı Sütlü Çikolata 77 G.jpg" },
+    { name: "Migros İç Ceviz 150 G",                price: 109.00, img: "migros_dataset_merged/snack_Migros İç Ceviz 150 G.jpg" }
+];
 
 // =====================================================
-// SEPET & UI
+// DURUM
 // =====================================================
 let cart = [];
 let currentProduct = null;
 let currentScanQuantity = 1;
+const scanStatusEl = document.getElementById('scan-status');
 
+// =====================================================
+// GÖRÜNÜM SİSTEMİ
+// =====================================================
 const views = {
     login:    document.getElementById('login-view'),
     register: document.getElementById('register-view'),
@@ -169,6 +33,16 @@ const views = {
     cart:     document.getElementById('cart-view')
 };
 
+function showView(viewName) {
+    Object.values(views).forEach(v => v.classList.remove('active'));
+    views[viewName].classList.add('active');
+    if (viewName === 'cart') renderCart();
+    if (viewName !== 'scanner') hideDetection();
+}
+
+// =====================================================
+// DOM ELEMANLARI
+// =====================================================
 const elements = {
     startScanningBtn: document.getElementById('btn-start-scanning'),
     scanTrigger:      document.getElementById('btn-scan-trigger'),
@@ -193,43 +67,50 @@ const elements = {
     bottomNav:        document.getElementById('bottom-nav')
 };
 
-function showView(viewName) {
-    Object.values(views).forEach(v => v.classList.remove('active'));
-    views[viewName].classList.add('active');
-
-    if (viewName === 'scanner') {
-        startCamera();
-    } else {
-        stopCamera();
-        hideDetection();
-    }
-    if (viewName === 'cart') renderCart();
+// =====================================================
+// TARAMA SİMÜLASYONU
+// =====================================================
+function setScanStatus(msg, active = false) {
+    if (!scanStatusEl) return;
+    scanStatusEl.textContent = msg;
+    scanStatusEl.classList.toggle('detecting', active);
 }
 
+function triggerScan() {
+    if (currentProduct) return;
+
+    elements.scanTrigger.disabled = true;
+    setScanStatus('🔍 Ürün tanımlanıyor...', true);
+
+    setTimeout(() => {
+        const product = mockData[Math.floor(Math.random() * mockData.length)];
+        currentProduct = { ...product };
+        elements.scanTrigger.disabled = false;
+        showDetection(currentProduct);
+    }, 1400);
+}
+
+// =====================================================
+// ÜRÜN TESPİT / GİZLE
+// =====================================================
 function showDetection(product) {
     currentScanQuantity = 1;
     elements.scanQuantity.innerText = currentScanQuantity;
 
-    if (product.img) {
-        elements.detectedImg.src = product.img;
-        elements.detectedImg.style.display = 'block';
-    } else {
-        elements.detectedImg.style.display = 'none';
-    }
+    elements.detectedImg.src = product.img;
     elements.detectedImg.alt = product.name;
+    elements.detectedImg.style.display = 'block';
     elements.productName.innerText = product.name;
-    elements.productPrice.innerText = product.price ? `${Number(product.price).toFixed(2)} TL` : '—';
+    elements.productPrice.innerText = `${Number(product.price).toFixed(2)} TL`;
 
-    setScanStatus('✅ Ürün tanındı!', true);
+    setScanStatus('✅ Ürün bulundu!', true);
 
     elements.detectionLabel.classList.remove('hidden');
     elements.popup.classList.remove('hidden');
     elements.bottomNav.style.opacity = '0';
     elements.bottomNav.style.pointerEvents = 'none';
 
-    requestAnimationFrame(() => {
-        elements.popup.classList.add('active');
-    });
+    requestAnimationFrame(() => elements.popup.classList.add('active'));
 }
 
 function hideDetection() {
@@ -239,24 +120,26 @@ function hideDetection() {
     elements.bottomNav.style.pointerEvents = 'auto';
     setTimeout(() => elements.popup.classList.add('hidden'), 400);
     currentProduct = null;
-    if (cameraStream) setScanStatus('📷 Ürünü vizöre getirin ve "Tara" butonuna basın');
+    setScanStatus('Tara butonuna basın');
 }
 
+// =====================================================
+// SEPET
+// =====================================================
 function addToCart() {
-    if (currentProduct) {
-        const existingItem = cart.find(item => item.name === currentProduct.name);
-        if (existingItem) {
-            existingItem.quantity = (existingItem.quantity || 1) + currentScanQuantity;
-        } else {
-            cart.push({ ...currentProduct, quantity: currentScanQuantity });
-        }
-        updateCartBadge();
-        hideDetection();
+    if (!currentProduct) return;
+    const existing = cart.find(i => i.name === currentProduct.name);
+    if (existing) {
+        existing.quantity = (existing.quantity || 1) + currentScanQuantity;
+    } else {
+        cart.push({ ...currentProduct, quantity: currentScanQuantity });
     }
+    updateCartBadge();
+    hideDetection();
 }
 
 function updateCartBadge() {
-    const total = cart.reduce((sum, item) => sum + (item.quantity || 1), 0);
+    const total = cart.reduce((s, i) => s + (i.quantity || 1), 0);
     elements.cartCount.innerText = total;
     if (elements.cartCountHome) elements.cartCountHome.innerText = total;
 }
@@ -271,22 +154,24 @@ function renderCart() {
     elements.cartItems.innerHTML = cart.map((item, index) => {
         const qty   = item.quantity || 1;
         const total = item.price * qty;
-        const imgTag = item.img
-            ? `<img src="${item.img}" class="item-img" alt="${item.name}">`
-            : `<div class="item-img-placeholder">🛒</div>`;
         return `
         <div class="cart-item">
-            ${imgTag}
+            <img src="${item.img}" class="item-img" alt="${item.name}"
+                 onerror="this.style.display='none'">
             <div class="item-info">
-                <h4>${item.name}${qty > 1 ? ` <span style="color:var(--migros);font-weight:800">x${qty}</span>` : ''}</h4>
-                <p>${total.toFixed(2)} TL${qty > 1 ? ` <span style="font-size:12px;color:var(--text-dim)">(${item.price.toFixed(2)} TL/adet)</span>` : ''}</p>
+                <h4>${item.name}${qty > 1
+                    ? ` <span style="color:var(--migros);font-weight:800">x${qty}</span>`
+                    : ''}</h4>
+                <p>${total.toFixed(2)} TL${qty > 1
+                    ? ` <span style="font-size:12px;color:var(--text-dim)">(${item.price.toFixed(2)} TL/adet)</span>`
+                    : ''}</p>
             </div>
             <button class="btn-icon" onclick="removeFromCart(${index})">×</button>
         </div>`;
     }).join('');
 
-    const grandTotal = cart.reduce((s, i) => s + (i.price * (i.quantity || 1)), 0);
-    elements.totalAmount.innerText = `${grandTotal.toFixed(2)} TL`;
+    const grand = cart.reduce((s, i) => s + (i.price * (i.quantity || 1)), 0);
+    elements.totalAmount.innerText = `${grand.toFixed(2)} TL`;
 }
 
 window.removeFromCart = (index) => {
@@ -307,11 +192,17 @@ elements.backToScanner.addEventListener('click',   () => showView('scanner'));
 elements.btnYes.addEventListener('click',          addToCart);
 elements.btnNo.addEventListener('click',           hideDetection);
 elements.btnQtyMinus.addEventListener('click', () => {
-    if (currentScanQuantity > 1) { currentScanQuantity--; elements.scanQuantity.innerText = currentScanQuantity; }
+    if (currentScanQuantity > 1) {
+        currentScanQuantity--;
+        elements.scanQuantity.innerText = currentScanQuantity;
+    }
 });
 elements.btnQtyPlus.addEventListener('click', () => {
-    currentScanQuantity++; elements.scanQuantity.innerText = currentScanQuantity;
+    currentScanQuantity++;
+    elements.scanQuantity.innerText = currentScanQuantity;
 });
 
-// Initial State
+// =====================================================
+// BAŞLANGIÇ
+// =====================================================
 updateCartBadge();
