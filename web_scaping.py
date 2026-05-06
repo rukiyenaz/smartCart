@@ -14,7 +14,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 def setup_driver():
     """Tarayıcı ayarlarını yapar ve başlatır."""
     chrome_options = Options()
-    # chrome_options.add_argument("--headless")  # Arka planda çalışması için bu satırı açabilirsin
+    # chrome_options.add_argument("--headless") 
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
@@ -212,5 +212,5 @@ def scrape_migros_category(category_url, folder_name, item_limit=50):
         driver.quit()
 
 # --- KULLANIM ---
-target_url = "https://www.migros.com.tr/atistirmalik-c-113fb?srsltid=AfmBOorb3UjP-LY0Z6T9V0HQMXq8vozDdm-3m_VVSr1zlhXOb76C2V7G" # Örnek: Atıştırmalık kategorisi
-scrape_migros_category(target_url, "migros_dataset", item_limit=30)
+target_url = "https://www.migros.com.tr/arama?q=%C3%A7ikolata&sayfa=3&sirala=once-en-dusuk-fiyat" # Örnek: Atıştırmalık kategorisi
+scrape_migros_category(target_url, "migros_dataset_cikolata", item_limit=30)
