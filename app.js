@@ -113,7 +113,10 @@ const elements = {
     cartItems:        document.getElementById('cart-items'),
     totalAmount:      document.getElementById('total-amount'),
     bottomNav:        document.getElementById('bottom-nav'),
-    btnCheckout:      document.getElementById('btn-checkout')
+    btnCheckout:      document.getElementById('btn-checkout'),
+    checkoutModal:    document.getElementById('checkout-modal'),
+    modalTotal:       document.getElementById('modal-total'),
+    btnModalOk:       document.getElementById('btn-modal-ok')
 };
 
 // =====================================================
@@ -251,12 +254,14 @@ elements.btnQtyPlus.addEventListener('click', () => {
     elements.scanQuantity.innerText = currentScanQuantity;
 });
 elements.btnCheckout.addEventListener('click', () => {
-    if (cart.length === 0) {
-        alert('Sepetiniz boş!');
-        return;
-    }
+    if (cart.length === 0) return;
     const grand = cart.reduce((s, i) => s + (i.price * (i.quantity || 1)), 0);
-    alert(`Toplam tutar: ${grand.toFixed(2)} TL\nBizi tercih ettiğiniz için teşekkürler!`);
+    elements.modalTotal.innerText = `${grand.toFixed(2)} TL`;
+    elements.checkoutModal.classList.remove('hidden');
+});
+
+elements.btnModalOk.addEventListener('click', () => {
+    elements.checkoutModal.classList.add('hidden');
     cart = [];
     updateCartBadge();
     renderCart();
