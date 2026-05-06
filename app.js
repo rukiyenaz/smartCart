@@ -14,6 +14,27 @@ const mockData = [
     { name: "Migros İç Ceviz 150 G",                price: 109.00, img: "migros_dataset_merged/snack_Migros İç Ceviz 150 G.jpg" }
 ];
 
+let productsData = [...mockData]; // Varsayılan olarak mockData ile başlat
+
+// Supabase'den ürünleri çek
+async function fetchProducts() {
+    try {
+        const { data, error } = await supabaseClient.from('products').select('*');
+        if (error) {
+            console.error("Supabase ürün çekme hatası:", error);
+        } else if (data && data.length > 0) {
+            productsData = data;
+            console.log("Ürünler Supabase'den başarıyla çekildi:", productsData.length);
+        }
+    } catch (err) {
+        console.error("Ürün çekilirken beklenmeyen hata:", err);
+    }
+}
+
+// Uygulama başlarken ürünleri çek
+fetchProducts();
+
+
 // =====================================================
 // DURUM
 // =====================================================
@@ -84,7 +105,7 @@ function triggerScan() {
     setScanStatus('🔍 Ürün tanımlanıyor...', true);
 
     setTimeout(() => {
-        const product = mockData[Math.floor(Math.random() * mockData.length)];
+        const product = productsData[Math.floor(Math.random() * productsData.length)];
         currentProduct = { ...product };
         elements.scanTrigger.disabled = false;
         showDetection(currentProduct);
