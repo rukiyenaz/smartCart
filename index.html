@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TwoByte AI - Akıllı Alışveriş Asistanı</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+
+        <!-- ==================== GİRİŞ EKRANI ==================== -->
+        <section id="login-view" class="view active">
+            <div class="auth-bg">
+                <div class="auth-blob blob-1"></div>
+                <div class="auth-blob blob-2"></div>
+            </div>
+            <div class="auth-container">
+                <div class="auth-logo">
+                    <div class="migros-badge">M</div>
+                    <h1>TwoByte<span>AI</span></h1>
+                    <p>Migros Akıllı Alışveriş</p>
+                </div>
+                <div class="auth-card">
+                    <h2>Giriş Yap</h2>
+                    <div id="login-error" class="auth-error hidden"></div>
+                    <div class="input-group">
+                        <label for="login-email">E-posta</label>
+                        <input type="email" id="login-email" placeholder="ornek@mail.com">
+                    </div>
+                    <div class="input-group">
+                        <label for="login-password">Şifre</label>
+                        <input type="password" id="login-password" placeholder="••••••••">
+                    </div>
+                    <button id="btn-login" class="btn-auth">Giriş Yap</button>
+                    <p class="auth-switch">Hesabın yok mu? <a id="go-to-register">Kayıt Ol</a></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== KAYIT EKRANI ==================== -->
+        <section id="register-view" class="view">
+            <div class="auth-bg">
+                <div class="auth-blob blob-1"></div>
+                <div class="auth-blob blob-2"></div>
+            </div>
+            <div class="auth-container">
+                <div class="auth-logo">
+                    <div class="migros-badge">M</div>
+                    <h1>TwoByte<span>AI</span></h1>
+                    <p>Migros Akıllı Alışveriş</p>
+                </div>
+                <div class="auth-card">
+                    <h2>Kayıt Ol</h2>
+                    <div id="register-error" class="auth-error hidden"></div>
+                    <div id="register-success" class="auth-success hidden"></div>
+                    <div class="input-group">
+                        <label for="register-name">Ad Soyad</label>
+                        <input type="text" id="register-name" placeholder="Ad Soyad">
+                    </div>
+                    <div class="input-group">
+                        <label for="register-email">E-posta</label>
+                        <input type="email" id="register-email" placeholder="ornek@mail.com">
+                    </div>
+                    <div class="input-group">
+                        <label for="register-password">Şifre</label>
+                        <input type="password" id="register-password" placeholder="En az 6 karakter">
+                    </div>
+                    <button id="btn-register" class="btn-auth">Kayıt Ol</button>
+                    <p class="auth-switch">Zaten hesabın var mı? <a id="go-to-login">Giriş Yap</a></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== ANA EKRAN ==================== -->
+        <section id="home-view" class="view">
+            <div class="home-content">
+                <div class="home-header">
+                    <div class="user-greeting">
+                        <span id="user-name-display">Merhaba 👋</span>
+                    </div>
+                    <button id="btn-logout" class="btn-logout" title="Çıkış Yap">⏻</button>
+                </div>
+                <div class="home-hero">
+                    <div class="migros-logo-big">M</div>
+                    <h2>TwoByte <span>AI</span></h2>
+                    <p>Ürünü tara, sepete ekle, alışverişini tamamla.</p>
+                </div>
+                <button id="btn-start-scanning" class="btn-primary">📷 Taramaya Başla</button>
+                <button id="btn-go-to-cart-home" class="btn-secondary">🛒 Sepetim (<span id="cart-count-home">0</span>)</button>
+            </div>
+        </section>
+
+        <!-- ==================== TARAMA EKRANI ==================== -->
+        <section id="scanner-view" class="view">
+            <div class="camera-simulation">
+                <video id="camera-feed" autoplay playsinline muted></video>
+                <div class="camera-fallback" id="camera-fallback">
+                    <div class="fallback-m">M</div>
+                </div>
+
+                <div class="scanner-overlay">
+                    <div class="viewfinder">
+                        <div class="scan-line"></div>
+                        <div class="corners"></div>
+                    </div>
+                    <div id="scan-status" class="scan-status">Barkodu çerçeve içine alın</div>
+                </div>
+
+                <div id="detection-label" class="floating-label hidden">
+                    <img id="detected-img" class="detected-product-img" src="" alt="">
+                    <div class="label-content">
+                        <span class="label-title">Ürün Tespit Edildi</span>
+                        <h2 id="product-name">Bisküvi</h2>
+                        <span id="product-price" class="label-price">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ui-overlay">
+                <div class="app-header">
+                    <button id="btn-back-to-home" class="btn-back">←</button>
+                    <h1>TwoByte<span>AI</span></h1>
+                    <div style="width:40px"></div>
+                </div>
+
+                <div id="add-to-cart-popup" class="popup-card hidden">
+                    <h3>Sepete Eklensin mi?</h3>
+                    <div class="quantity-selector">
+                        <button id="btn-qty-minus" class="btn-icon btn-qty">−</button>
+                        <span id="scan-quantity">1</span>
+                        <button id="btn-qty-plus" class="btn-icon btn-qty">+</button>
+                    </div>
+                    <div class="popup-actions">
+                        <button id="btn-no" class="btn btn-red">Hayır</button>
+                        <button id="btn-yes" class="btn btn-green">Evet</button>
+                    </div>
+                </div>
+
+                <div id="bottom-nav" class="bottom-nav">
+                    <button id="btn-scan-trigger" class="btn-primary">📷 Ürünü Tara</button>
+                    <button id="btn-go-to-cart" class="btn-secondary">🛒 Sepetim (<span id="cart-count">0</span>)</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== SEPET EKRANI ==================== -->
+        <section id="cart-view" class="view">
+            <div class="cart-header">
+                <button id="btn-back-to-scanner" class="btn-icon">←</button>
+                <h2>Sepetim</h2>
+            </div>
+            <div class="cart-content">
+                <div id="cart-items" class="cart-items-list">
+                    <div class="empty-cart">Sepetiniz boş.</div>
+                </div>
+            </div>
+            <div class="cart-footer">
+                <div class="total-row">
+                    <span>Toplam</span>
+                    <span id="total-amount">0.00 TL</span>
+                </div>
+                <button id="btn-checkout" class="btn-primary btn-block">Ödemeye Geç</button>
+            </div>
+        </section>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="auth.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
