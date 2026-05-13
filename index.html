@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="TwoByte AI – Migros ürünlerini kameranızla tanıyın, sepete ekleyin.">
     <title>TwoByte AI - Akıllı Alışveriş Asistanı</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
@@ -85,7 +86,7 @@
                 <div class="home-hero">
                     <div class="migros-logo-big">M</div>
                     <h2>TwoByte <span>AI</span></h2>
-                    <p>Ürünü tara, sepete ekle, alışverişini tamamla.</p>
+                    <p>Ürünü kameraya göster, otomatik tanısın ve sepete eklesin.</p>
                 </div>
                 <button id="btn-start-scanning" class="btn-primary">📷 Taramaya Başla</button>
                 <button id="btn-go-to-cart-home" class="btn-secondary">🛒 Sepetim (<span id="cart-count-home">0</span>)</button>
@@ -94,25 +95,42 @@
 
         <!-- ==================== TARAMA EKRANI ==================== -->
         <section id="scanner-view" class="view">
-            <div class="camera-simulation">
+
+            <!-- Kamera alanı -->
+            <div id="camera-area" class="camera-area">
+                <video id="camera-feed" class="camera-feed" autoplay playsinline muted></video>
+                <canvas id="capture-canvas" style="display:none"></canvas>
+
+                <!-- Viewfinder çerçeve -->
                 <div class="scanner-overlay">
                     <div class="viewfinder">
                         <div class="scan-line"></div>
-                        <div class="corners"></div>
+                        <div class="corner tl"></div>
+                        <div class="corner tr"></div>
+                        <div class="corner bl"></div>
+                        <div class="corner br"></div>
                     </div>
                     <div id="scan-status" class="scan-status">Tara butonuna basın</div>
+                    <span id="scan-mode-badge" class="mode-badge demo">🎲 Demo Modu</span>
                 </div>
 
+                <!-- Tanınan ürün etiketi (kamera üstü) -->
                 <div id="detection-label" class="floating-label hidden">
                     <img id="detected-img" class="detected-product-img" src="" alt="">
                     <div class="label-content">
                         <span class="label-title">Ürün Tespit Edildi</span>
-                        <h2 id="product-name">Bisküvi</h2>
+                        <h2 id="product-name">—</h2>
                         <span id="product-price" class="label-price">—</span>
                     </div>
                 </div>
+
+                <!-- Ürün bulunamadı mesajı -->
+                <div id="not-found-msg" class="not-found-msg hidden">
+                    Ürün tanınamadı. Lütfen ürünü daha yakın tutun.
+                </div>
             </div>
 
+            <!-- UI Üst katman -->
             <div class="ui-overlay">
                 <div class="app-header">
                     <button id="btn-back-to-home" class="btn-back">←</button>
@@ -120,22 +138,24 @@
                     <div style="width:40px"></div>
                 </div>
 
+                <!-- Sepete ekle popup -->
                 <div id="add-to-cart-popup" class="popup-card hidden">
                     <h3>Sepete Eklensin mi?</h3>
                     <div class="quantity-selector">
                         <button id="btn-qty-minus" class="btn-icon btn-qty">−</button>
                         <span id="scan-quantity">1</span>
-                        <button id="btn-qty-plus" class="btn-icon btn-qty">+</button>
+                        <button id="btn-qty-plus"  class="btn-icon btn-qty">+</button>
                     </div>
                     <div class="popup-actions">
-                        <button id="btn-no" class="btn btn-red">Hayır</button>
+                        <button id="btn-no"  class="btn btn-red">Hayır</button>
                         <button id="btn-yes" class="btn btn-green">Evet</button>
                     </div>
                 </div>
 
+                <!-- Alt navigasyon -->
                 <div id="bottom-nav" class="bottom-nav">
                     <button id="btn-scan-trigger" class="btn-primary">📷 Ürünü Tara</button>
-                    <button id="btn-go-to-cart" class="btn-secondary">🛒 Sepetim (<span id="cart-count">0</span>)</button>
+                    <button id="btn-go-to-cart"   class="btn-secondary">🛒 Sepetim (<span id="cart-count">0</span>)</button>
                 </div>
             </div>
         </section>

@@ -1,66 +1,55 @@
-// Supabase istemcisi auth.js'de tanımlandı (supabaseClient)
+// =====================================================
+// SmartCart – Gerçek Görüntü İşleme ile Ürün Tanıma
+// =====================================================
+
+const API_BASE = "http://localhost:5000/api";
 
 // =====================================================
-// ÖRNEK ÜRÜN VERİSİ (Simülasyon)
+// ÜRÜN VERİSİ
 // =====================================================
-const mockData = [
-    { name: "Biscolata Mood Bardak 125 G",          price: 56.00,  img: "migros_dataset_merged/snack_Biscolata Mood Bardak 125 G.jpg" },
-    { name: "Doritos Storm Flamin Hot 125 G",        price: 58.95,  img: "migros_dataset_merged/snack_Doritos Storm Flamin Hot Süper Boy 125 G.jpg" },
-    { name: "Eti Karam Gurme Bitter Gofret 50 G",   price: 29.95,  img: "migros_dataset_merged/snack_Eti Karam Gurme Bitter Çikolatalı Gofret 50 g.jpg" },
-    { name: "Tadelle Fındıklı Sütlü Çikolata 3x52G",price: 187.50, img: "migros_dataset_merged/snack_Tadelle Fındık Dolgulu Sütlü Çikolata 3 x 52 G.jpg" },
-    { name: "Eti Crax Çubuk Kraker 40 G",           price: 7.50,   img: "migros_dataset_merged/snack_Eti Crax Çubuk Kraker 40 G.jpg" },
-    { name: "Doritos Nacho Süper Boy 130 G",         price: 54.95,  img: "migros_dataset_merged/snack_Doritos Nacho Süper Boy 130 G.jpg" },
-    { name: "Kahve Dünyası Tambol Fındıklı 77 G",   price: 84.95,  img: "migros_dataset_merged/snack_Kahve Dünyası Tambol Fındıklı Sütlü Çikolata 77 G.jpg" },
-    { name: "Migros İç Ceviz 150 G",                price: 109.00, img: "migros_dataset_merged/snack_Migros İç Ceviz 150 G.jpg" }
-];
+let productsData = [];
 
-let productsData = [...mockData]; // Varsayılan olarak mockData ile başlat
-
-// metadata.csv'den ürünleri çek
 async function fetchProducts() {
     try {
-        const response = await fetch('migros_dataset_merged/metadata.csv');
-        if (!response.ok) throw new Error('CSV dosyası bulunamadı');
-        
-        const csvText = await response.text();
-        const lines = csvText.split('\n');
-        const parsedProducts = [];
-        
-        // İlk satır başlıklar (name,safe_name,price,link,image,file)
-        for (let i = 1; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (!line) continue;
-            
-            const columns = line.split(',');
-            // En az 6 sütun bekliyoruz (son sütun dosya adı)
-            if (columns.length >= 6) {
-                const name = columns[0];
-                const price = parseFloat(columns[2]);
-                const file = columns[columns.length - 1].trim();
-                
-                // Eğer fiyat geçerli bir sayıysa listeye ekle
-                if (!isNaN(price) && file) {
-                    parsedProducts.push({
-                        name: name,
-                        price: price,
-                        img: 'migros_dataset_merged/' + file
-                    });
+        // Önce backend API'ye bak
+        const resp = await fetch(`${API_BASE}/products`, { signal: AbortSignal.timeout(3000) });
+        if (resp.ok) {
+            productsData = await resp.json();
+            console.log("✅ Ürünler backend'den yüklendi:", productsData.length);
+            return;
+        }
+    } catch (_) {
+        console.warn("⚠️ Backend bağlantısı yok, CSV'den yüklenecek.");
+    }
+
+    // Fallback: metadata.csv
+    try {
+        const resp = await fetch("migros_dataset_merged/metadata.csv");
+        if (!resp.ok) throw new Error();
+        const text = await resp.text();
+        const lines = text.split("\n").slice(1);
+        const parsed = [];
+        for (const line of lines) {
+            const cols = line.trim().split(",");
+            if (cols.length >= 6) {
+                const name  = cols[0];
+                const price = parseFloat(cols[2]) || 0;
+                const file  = cols[cols.length - 1].trim();
+                if (name && file) {
+                    parsed.push({ name, price, img: "migros_dataset_merged/" + file });
                 }
             }
         }
-        
-        if (parsedProducts.length > 0) {
-            productsData = parsedProducts;
-            console.log("Ürünler metadata.csv'den başarıyla çekildi. Toplam ürün:", productsData.length);
+        if (parsed.length) {
+            productsData = parsed;
+            console.log("✅ Ürünler CSV'den yüklendi:", productsData.length);
         }
-    } catch (err) {
-        console.error("CSV çekilirken beklenmeyen hata, varsayılan liste kullanılıyor:", err);
+    } catch (e) {
+        console.error("❌ Ürün verisi yüklenemedi:", e);
     }
 }
 
-// Uygulama başlarken ürünleri çek
 fetchProducts();
-
 
 // =====================================================
 // DURUM
@@ -68,78 +57,209 @@ fetchProducts();
 let cart = [];
 let currentProduct = null;
 let currentScanQuantity = 1;
-const scanStatusEl = document.getElementById('scan-status');
+let cameraStream = null;
+let isScanning = false;
+let backendAvailable = false;
+
+const scanStatusEl = document.getElementById("scan-status");
+
+// Backend durumunu kontrol et
+async function checkBackend() {
+    try {
+        const resp = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(3000) });
+        if (resp.ok) {
+            const data = await resp.json();
+            backendAvailable = true;
+            console.log(`✅ Backend aktif | Mod: ${data.mode} | Ürün: ${data.products}`);
+            
+            // Mod göster
+            const modeEl = document.getElementById("scan-mode-badge");
+            if (modeEl) {
+                modeEl.textContent = data.mode === "ai" ? "🤖 AI Modu" : "🎲 Demo Modu";
+                modeEl.className   = data.mode === "ai" ? "mode-badge ai" : "mode-badge demo";
+            }
+        }
+    } catch (_) {
+        backendAvailable = false;
+        const modeEl = document.getElementById("scan-mode-badge");
+        if (modeEl) {
+            modeEl.textContent = "🎲 Demo Modu";
+            modeEl.className   = "mode-badge demo";
+        }
+    }
+}
 
 // =====================================================
 // GÖRÜNÜM SİSTEMİ
 // =====================================================
 const views = {
-    login:    document.getElementById('login-view'),
-    register: document.getElementById('register-view'),
-    home:     document.getElementById('home-view'),
-    scanner:  document.getElementById('scanner-view'),
-    cart:     document.getElementById('cart-view')
+    login:    document.getElementById("login-view"),
+    register: document.getElementById("register-view"),
+    home:     document.getElementById("home-view"),
+    scanner:  document.getElementById("scanner-view"),
+    cart:     document.getElementById("cart-view"),
 };
 
 function showView(viewName) {
-    Object.values(views).forEach(v => v.classList.remove('active'));
-    views[viewName].classList.add('active');
-    if (viewName === 'cart') renderCart();
-    if (viewName !== 'scanner') hideDetection();
+    Object.values(views).forEach(v => v && v.classList.remove("active"));
+    if (views[viewName]) views[viewName].classList.add("active");
+    if (viewName === "cart") renderCart();
+    if (viewName === "scanner") {
+        startCamera();
+        checkBackend();
+    } else {
+        stopCamera();
+        hideDetection();
+    }
 }
 
 // =====================================================
-// DOM ELEMANLARI
+// KAMERA
 // =====================================================
-const elements = {
-    startScanningBtn: document.getElementById('btn-start-scanning'),
-    scanTrigger:      document.getElementById('btn-scan-trigger'),
-    goToCart:         document.getElementById('btn-go-to-cart'),
-    backToScanner:    document.getElementById('btn-back-to-scanner'),
-    backToHome:       document.getElementById('btn-back-to-home'),
-    goToCartHome:     document.getElementById('btn-go-to-cart-home'),
-    cartCountHome:    document.getElementById('cart-count-home'),
-    btnYes:           document.getElementById('btn-yes'),
-    btnNo:            document.getElementById('btn-no'),
-    btnQtyMinus:      document.getElementById('btn-qty-minus'),
-    btnQtyPlus:       document.getElementById('btn-qty-plus'),
-    scanQuantity:     document.getElementById('scan-quantity'),
-    popup:            document.getElementById('add-to-cart-popup'),
-    detectionLabel:   document.getElementById('detection-label'),
-    detectedImg:      document.getElementById('detected-img'),
-    productName:      document.getElementById('product-name'),
-    productPrice:     document.getElementById('product-price'),
-    cartCount:        document.getElementById('cart-count'),
-    cartItems:        document.getElementById('cart-items'),
-    totalAmount:      document.getElementById('total-amount'),
-    bottomNav:        document.getElementById('bottom-nav'),
-    btnCheckout:      document.getElementById('btn-checkout'),
-    checkoutModal:    document.getElementById('checkout-modal'),
-    modalTotal:       document.getElementById('modal-total'),
-    btnModalOk:       document.getElementById('btn-modal-ok')
-};
+const videoEl    = document.getElementById("camera-feed");
+const canvasEl   = document.getElementById("capture-canvas");
+
+async function startCamera() {
+    if (cameraStream) return; // Zaten açık
+    try {
+        setScanStatus("📷 Kamera başlatılıyor...", true);
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: { ideal: "environment" }, // Arka kamera
+                width:  { ideal: 1280 },
+                height: { ideal: 720 },
+            },
+            audio: false,
+        });
+        cameraStream = stream;
+        if (videoEl) {
+            videoEl.srcObject = stream;
+            videoEl.play();
+        }
+        setScanStatus("Tara butonuna basın");
+        console.log("✅ Kamera başlatıldı");
+    } catch (err) {
+        console.error("❌ Kamera hatası:", err);
+        setScanStatus("❌ Kamera erişimi reddedildi");
+        showCameraError(err);
+    }
+}
+
+function stopCamera() {
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(t => t.stop());
+        cameraStream = null;
+        if (videoEl) videoEl.srcObject = null;
+    }
+}
+
+function captureFrame() {
+    if (!videoEl || !canvasEl) return null;
+    canvasEl.width  = videoEl.videoWidth  || 640;
+    canvasEl.height = videoEl.videoHeight || 480;
+    const ctx = canvasEl.getContext("2d");
+    ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+    return canvasEl.toDataURL("image/jpeg", 0.85);
+}
+
+function showCameraError(err) {
+    const camArea = document.getElementById("camera-area");
+    if (!camArea) return;
+    let msg = "Kamera açılamadı.";
+    if (err.name === "NotAllowedError")  msg = "Kamera izni reddedildi. Tarayıcı ayarlarından izin verin.";
+    if (err.name === "NotFoundError")    msg = "Kamera bulunamadı.";
+    if (err.name === "NotReadableError") msg = "Kamera başka uygulama tarafından kullanılıyor.";
+    camArea.innerHTML = `
+        <div class="camera-error">
+            <div class="camera-error-icon">📷</div>
+            <p>${msg}</p>
+            <button class="btn-retry" onclick="startCamera()">Tekrar Dene</button>
+        </div>`;
+}
 
 // =====================================================
-// TARAMA SİMÜLASYONU
+// TARAMA (GERÇEK AI)
 // =====================================================
 function setScanStatus(msg, active = false) {
     if (!scanStatusEl) return;
     scanStatusEl.textContent = msg;
-    scanStatusEl.classList.toggle('detecting', active);
+    scanStatusEl.classList.toggle("detecting", active);
 }
 
-function triggerScan() {
-    if (currentProduct) return;
+async function triggerScan() {
+    if (currentProduct || isScanning) return;
+    isScanning = true;
 
-    elements.scanTrigger.disabled = true;
-    setScanStatus('🔍 Ürün tanımlanıyor...', true);
+    const scanBtn = document.getElementById("btn-scan-trigger");
+    if (scanBtn) { scanBtn.disabled = true; scanBtn.textContent = "⏳ Tanıyor..."; }
 
-    setTimeout(() => {
-        const product = productsData[Math.floor(Math.random() * productsData.length)];
-        currentProduct = { ...product };
-        elements.scanTrigger.disabled = false;
-        showDetection(currentProduct);
-    }, 1400);
+    setScanStatus("🔍 Görüntü analiz ediliyor...", true);
+
+    try {
+        let product = null;
+
+        if (backendAvailable) {
+            // Gerçek AI tanıma
+            const imageB64 = captureFrame();
+            if (!imageB64) throw new Error("Kamera görüntüsü alınamadı");
+
+            const resp = await fetch(`${API_BASE}/recognize`, {
+                method:  "POST",
+                headers: { "Content-Type": "application/json" },
+                body:    JSON.stringify({ image: imageB64 }),
+                signal:  AbortSignal.timeout(15000),
+            });
+
+            if (!resp.ok) throw new Error(`API hatası: ${resp.status}`);
+            const result = await resp.json();
+
+            if (result.found && result.product) {
+                product = result.product;
+                const confPct = Math.round((result.confidence || 0.9) * 100);
+                setScanStatus(`✅ Tanındı (%${confPct} güven)`, true);
+            } else {
+                setScanStatus("❓ Ürün listede bulunamadı");
+                showNotFoundMessage(result.ai_raw || "");
+            }
+        } else {
+            // Demo modu: simülasyon
+            await new Promise(r => setTimeout(r, 1400));
+            if (productsData.length) {
+                product = { ...productsData[Math.floor(Math.random() * productsData.length)] };
+            }
+            setScanStatus("✅ Ürün bulundu! (Demo)", true);
+        }
+
+        if (product) {
+            currentProduct = product;
+            showDetection(product);
+        }
+
+    } catch (err) {
+        console.error("Tarama hatası:", err);
+        setScanStatus("❌ Hata oluştu");
+        
+        // Hata durumunda demo moda düş
+        if (productsData.length) {
+            await new Promise(r => setTimeout(r, 500));
+            const product = { ...productsData[Math.floor(Math.random() * productsData.length)] };
+            currentProduct = product;
+            setScanStatus("✅ Ürün bulundu! (Demo)", true);
+            showDetection(product);
+        }
+    } finally {
+        isScanning = false;
+        if (scanBtn) { scanBtn.disabled = false; scanBtn.textContent = "📷 Ürünü Tara"; }
+    }
+}
+
+function showNotFoundMessage(raw) {
+    const notFoundEl = document.getElementById("not-found-msg");
+    if (notFoundEl) {
+        notFoundEl.textContent = "Ürün tanınamadı. Lütfen ürünü kameraya daha yakın tutun.";
+        notFoundEl.classList.remove("hidden");
+        setTimeout(() => notFoundEl.classList.add("hidden"), 3000);
+    }
 }
 
 // =====================================================
@@ -147,32 +267,54 @@ function triggerScan() {
 // =====================================================
 function showDetection(product) {
     currentScanQuantity = 1;
-    elements.scanQuantity.innerText = currentScanQuantity;
+    const scanQuantityEl = document.getElementById("scan-quantity");
+    if (scanQuantityEl) scanQuantityEl.innerText = currentScanQuantity;
 
-    elements.detectedImg.src = product.img;
-    elements.detectedImg.alt = product.name;
-    elements.detectedImg.style.display = 'block';
-    elements.productName.innerText = product.name;
-    elements.productPrice.innerText = `${Number(product.price).toFixed(2)} TL`;
+    const detectedImg   = document.getElementById("detected-img");
+    const productNameEl = document.getElementById("product-name");
+    const productPriceEl= document.getElementById("product-price");
+    const detectionLbl  = document.getElementById("detection-label");
+    const popup         = document.getElementById("add-to-cart-popup");
+    const bottomNav     = document.getElementById("bottom-nav");
 
-    setScanStatus('✅ Ürün bulundu!', true);
+    if (detectedImg) {
+        detectedImg.src  = product.img;
+        detectedImg.alt  = product.name;
+        detectedImg.style.display = "block";
+        detectedImg.onerror = () => { detectedImg.style.display = "none"; };
+    }
+    if (productNameEl)  productNameEl.innerText  = product.name;
+    if (productPriceEl) productPriceEl.innerText = product.price
+        ? `${Number(product.price).toFixed(2)} TL`
+        : "Fiyat bilgisi yok";
 
-    elements.detectionLabel.classList.remove('hidden');
-    elements.popup.classList.remove('hidden');
-    elements.bottomNav.style.opacity = '0';
-    elements.bottomNav.style.pointerEvents = 'none';
-
-    requestAnimationFrame(() => elements.popup.classList.add('active'));
+    if (detectionLbl) detectionLbl.classList.remove("hidden");
+    if (popup) {
+        popup.classList.remove("hidden");
+        requestAnimationFrame(() => popup.classList.add("active"));
+    }
+    if (bottomNav) {
+        bottomNav.style.opacity = "0";
+        bottomNav.style.pointerEvents = "none";
+    }
 }
 
 function hideDetection() {
-    elements.detectionLabel.classList.add('hidden');
-    elements.popup.classList.remove('active');
-    elements.bottomNav.style.opacity = '1';
-    elements.bottomNav.style.pointerEvents = 'auto';
-    setTimeout(() => elements.popup.classList.add('hidden'), 400);
+    const detectionLbl = document.getElementById("detection-label");
+    const popup        = document.getElementById("add-to-cart-popup");
+    const bottomNav    = document.getElementById("bottom-nav");
+
+    if (detectionLbl) detectionLbl.classList.add("hidden");
+    if (popup) {
+        popup.classList.remove("active");
+        setTimeout(() => popup.classList.add("hidden"), 400);
+    }
+    if (bottomNav) {
+        bottomNav.style.opacity = "1";
+        bottomNav.style.pointerEvents = "auto";
+    }
     currentProduct = null;
-    setScanStatus('Tara butonuna basın');
+    setScanStatus("Tara butonuna basın");
 }
 
 // =====================================================
@@ -188,84 +330,118 @@ function addToCart() {
     }
     updateCartBadge();
     hideDetection();
+    showToast(`✅ "${currentProduct?.name?.split(" ").slice(0,3).join(" ")}..." sepete eklendi`);
 }
 
 function updateCartBadge() {
     const total = cart.reduce((s, i) => s + (i.quantity || 1), 0);
-    elements.cartCount.innerText = total;
-    if (elements.cartCountHome) elements.cartCountHome.innerText = total;
+    const cartCountEl     = document.getElementById("cart-count");
+    const cartCountHomeEl = document.getElementById("cart-count-home");
+    if (cartCountEl)     cartCountEl.innerText     = total;
+    if (cartCountHomeEl) cartCountHomeEl.innerText = total;
 }
 
 function renderCart() {
+    const cartItems  = document.getElementById("cart-items");
+    const totalAmtEl = document.getElementById("total-amount");
+    if (!cartItems) return;
+
     if (cart.length === 0) {
-        elements.cartItems.innerHTML = '<div class="empty-cart">Sepetiniz boş.</div>';
-        elements.totalAmount.innerText = '0.00 TL';
+        cartItems.innerHTML = '<div class="empty-cart">🛒 Sepetiniz boş.</div>';
+        if (totalAmtEl) totalAmtEl.innerText = "0.00 TL";
         return;
     }
 
-    elements.cartItems.innerHTML = cart.map((item, index) => {
+    cartItems.innerHTML = cart.map((item, idx) => {
         const qty   = item.quantity || 1;
-        const total = item.price * qty;
+        const total = (item.price || 0) * qty;
         return `
         <div class="cart-item">
-            <img src="${item.img}" class="item-img" alt="${item.name}"
-                 onerror="this.style.display='none'">
+            <img src="${item.img}" class="item-img" alt="${item.name}" onerror="this.style.display='none'">
             <div class="item-info">
                 <h4>${item.name}${qty > 1
                     ? ` <span style="color:var(--migros);font-weight:800">x${qty}</span>`
-                    : ''}</h4>
+                    : ""}</h4>
                 <p>${total.toFixed(2)} TL${qty > 1
-                    ? ` <span style="font-size:12px;color:var(--text-dim)">(${item.price.toFixed(2)} TL/adet)</span>`
-                    : ''}</p>
+                    ? ` <span style="font-size:12px;color:var(--text-dim)">(${(item.price||0).toFixed(2)} TL/adet)</span>`
+                    : ""}</p>
             </div>
-            <button class="btn-icon" onclick="removeFromCart(${index})">×</button>
+            <button class="btn-icon" onclick="removeFromCart(${idx})">×</button>
         </div>`;
-    }).join('');
+    }).join("");
 
-    const grand = cart.reduce((s, i) => s + (i.price * (i.quantity || 1)), 0);
-    elements.totalAmount.innerText = `${grand.toFixed(2)} TL`;
+    const grand = cart.reduce((s, i) => s + ((i.price || 0) * (i.quantity || 1)), 0);
+    if (totalAmtEl) totalAmtEl.innerText = `${grand.toFixed(2)} TL`;
 }
 
-window.removeFromCart = (index) => {
-    cart.splice(index, 1);
+window.removeFromCart = (idx) => {
+    cart.splice(idx, 1);
     renderCart();
     updateCartBadge();
 };
 
 // =====================================================
+// TOAST BİLDİRİM
+// =====================================================
+function showToast(msg) {
+    let toast = document.getElementById("toast-msg");
+    if (!toast) {
+        toast = document.createElement("div");
+        toast.id = "toast-msg";
+        toast.className = "toast";
+        document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 2800);
+}
+
+// =====================================================
 // EVENT LISTENERS
 // =====================================================
-elements.startScanningBtn.addEventListener('click', () => showView('scanner'));
-elements.goToCartHome.addEventListener('click',    () => showView('cart'));
-elements.backToHome.addEventListener('click',      () => showView('home'));
-elements.scanTrigger.addEventListener('click',     triggerScan);
-elements.goToCart.addEventListener('click',        () => showView('cart'));
-elements.backToScanner.addEventListener('click',   () => showView('scanner'));
-elements.btnYes.addEventListener('click',          addToCart);
-elements.btnNo.addEventListener('click',           hideDetection);
-elements.btnQtyMinus.addEventListener('click', () => {
+function safe(id, event, fn) {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(event, fn);
+}
+
+safe("btn-start-scanning", "click", () => showView("scanner"));
+safe("btn-go-to-cart-home","click", () => showView("cart"));
+safe("btn-back-to-home",   "click", () => showView("home"));
+safe("btn-scan-trigger",   "click", triggerScan);
+safe("btn-go-to-cart",     "click", () => showView("cart"));
+safe("btn-back-to-scanner","click", () => showView("scanner"));
+safe("btn-yes",            "click", addToCart);
+safe("btn-no",             "click", hideDetection);
+
+safe("btn-qty-minus", "click", () => {
     if (currentScanQuantity > 1) {
         currentScanQuantity--;
-        elements.scanQuantity.innerText = currentScanQuantity;
+        const el = document.getElementById("scan-quantity");
+        if (el) el.innerText = currentScanQuantity;
     }
 });
-elements.btnQtyPlus.addEventListener('click', () => {
+safe("btn-qty-plus", "click", () => {
     currentScanQuantity++;
-    elements.scanQuantity.innerText = currentScanQuantity;
-});
-elements.btnCheckout.addEventListener('click', () => {
-    if (cart.length === 0) return;
-    const grand = cart.reduce((s, i) => s + (i.price * (i.quantity || 1)), 0);
-    elements.modalTotal.innerText = `${grand.toFixed(2)} TL`;
-    elements.checkoutModal.classList.remove('hidden');
+    const el = document.getElementById("scan-quantity");
+    if (el) el.innerText = currentScanQuantity;
 });
 
-elements.btnModalOk.addEventListener('click', () => {
-    elements.checkoutModal.classList.add('hidden');
+safe("btn-checkout", "click", () => {
+    if (!cart.length) return;
+    const grand = cart.reduce((s, i) => s + ((i.price || 0) * (i.quantity || 1)), 0);
+    const modalTotalEl = document.getElementById("modal-total");
+    const checkoutModal= document.getElementById("checkout-modal");
+    if (modalTotalEl)  modalTotalEl.innerText = `${grand.toFixed(2)} TL`;
+    if (checkoutModal) checkoutModal.classList.remove("hidden");
+});
+
+safe("btn-modal-ok", "click", () => {
+    const checkoutModal = document.getElementById("checkout-modal");
+    if (checkoutModal) checkoutModal.classList.add("hidden");
     cart = [];
     updateCartBadge();
     renderCart();
-    showView('home');
+    showView("home");
 });
 
 // =====================================================

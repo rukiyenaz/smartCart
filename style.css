@@ -195,56 +195,114 @@ body { background: var(--bg-dark); color: var(--text); overflow: hidden; height:
 /* ===================================================
    TARAMA EKRANI
    =================================================== */
-.camera-simulation {
-    position: absolute; inset: 0;
+
+/* Gerçek Kamera Alanı */
+.camera-area {
+    position: absolute; inset: 0; z-index: 1; overflow: hidden;
+    background: #000;
+}
+.camera-feed {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* Kamera kapalıyken fallback arka plan */
+.camera-area:not(:has(video[srcObject])) {
     background:
         radial-gradient(ellipse at 30% 20%, rgba(249,115,22,0.55) 0%, transparent 55%),
         radial-gradient(ellipse at 80% 80%, rgba(234,88,12,0.40) 0%, transparent 50%),
-        radial-gradient(ellipse at 60% 50%, rgba(251,146,60,0.18) 0%, transparent 60%),
         linear-gradient(145deg, #2d1200 0%, #1a0c04 35%, #16131f 70%, #0f0f1a 100%);
-    z-index: 1; overflow: hidden;
 }
 
-/* Izgara deseni */
-.camera-simulation::before {
-    content: ''; position: absolute; inset: 0;
-    background-image:
-        repeating-linear-gradient(0deg,  rgba(249,115,22,0.07) 0px, rgba(249,115,22,0.07) 1px, transparent 1px, transparent 60px),
-        repeating-linear-gradient(90deg, rgba(249,115,22,0.07) 0px, rgba(249,115,22,0.07) 1px, transparent 1px, transparent 60px);
-    z-index: 0;
+/* Kamera hatası */
+.camera-error {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; height: 100%;
+    color: var(--text-dim); text-align: center; gap: 16px; padding: 32px;
+}
+.camera-error-icon { font-size: 64px; }
+.camera-error p    { font-size: 14px; line-height: 1.6; max-width: 260px; }
+.btn-retry {
+    background: var(--migros); color: white; border: none;
+    padding: 12px 24px; border-radius: 14px; font-weight: 700;
+    font-size: 14px; cursor: pointer;
 }
 
-/* Büyük M logosu */
-.camera-simulation::after {
-    content: 'M'; position: absolute;
-    font-family: 'Outfit', sans-serif; font-size: 520px; font-weight: 800;
-    color: rgba(249,115,22,0.14);
-    top: 50%; left: 50%; transform: translate(-50%, -50%);
-    pointer-events: none; z-index: 0;
-    text-shadow: 0 0 120px rgba(249,115,22,0.2);
+/* Mod badge (AI / Demo) */
+.mode-badge {
+    position: absolute; top: 16px; right: 16px; z-index: 5;
+    padding: 5px 12px; border-radius: 20px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+    backdrop-filter: blur(8px);
+}
+.mode-badge.ai {
+    background: rgba(34,197,94,0.2);
+    border: 1px solid rgba(34,197,94,0.5);
+    color: #86efac;
+}
+.mode-badge.demo {
+    background: rgba(249,115,22,0.2);
+    border: 1px solid rgba(249,115,22,0.5);
+    color: #fed7aa;
+}
+
+/* Ürün bulunamadı mesajı */
+.not-found-msg {
+    position: absolute; bottom: 180px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(239,68,68,0.9); color: white;
+    padding: 12px 20px; border-radius: 14px;
+    font-size: 13px; font-weight: 600;
+    text-align: center; max-width: 80vw;
+    animation: slideUp 0.3s ease;
+    z-index: 20;
+}
+@keyframes slideUp {
+    from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* Toast bildirimi */
+.toast {
+    position: fixed; bottom: 100px; left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(20,20,30,0.96); backdrop-filter: blur(16px);
+    border: 1px solid rgba(249,115,22,0.4);
+    color: white; padding: 12px 22px; border-radius: 16px;
+    font-size: 13px; font-weight: 600;
+    opacity: 0; pointer-events: none;
+    transition: all 0.3s ease;
+    z-index: 999; white-space: nowrap;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+.toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
 }
 
 .scanner-overlay {
-    height: 100%; display: flex; align-items: center; justify-content: center;
-    flex-direction: column; position: relative; z-index: 1;
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; z-index: 2;
 }
 .viewfinder {
     width: 240px; height: 240px;
     border: 1.5px solid rgba(255,255,255,0.15);
     position: relative; border-radius: 24px;
-    box-shadow: 0 0 0 1000px rgba(0,0,0,0.52);
+    box-shadow: 0 0 0 2000px rgba(0,0,0,0.45);
 }
-.viewfinder::before, .viewfinder::after,
-.viewfinder .corners::before, .viewfinder .corners::after {
-    content: ''; position: absolute;
-    width: 36px; height: 36px;
+
+/* Köşe indikatörleri */
+.corner {
+    position: absolute; width: 36px; height: 36px;
     border-color: var(--migros); border-style: solid;
     filter: drop-shadow(0 0 8px var(--migros));
 }
-.viewfinder::before { top: -2px; left: -2px; border-width: 4px 0 0 4px; border-top-left-radius: 18px; }
-.viewfinder::after  { top: -2px; right: -2px; border-width: 4px 4px 0 0; border-top-right-radius: 18px; }
-.viewfinder .corners::before { bottom: -2px; left: -2px; border-width: 0 0 4px 4px; border-bottom-left-radius: 18px; }
-.viewfinder .corners::after  { bottom: -2px; right: -2px; border-width: 0 4px 4px 0; border-bottom-right-radius: 18px; }
+.corner.tl { top: -2px; left: -2px; border-width: 4px 0 0 4px; border-top-left-radius: 18px; }
+.corner.tr { top: -2px; right: -2px; border-width: 4px 4px 0 0; border-top-right-radius: 18px; }
+.corner.bl { bottom: -2px; left: -2px; border-width: 0 0 4px 4px; border-bottom-left-radius: 18px; }
+.corner.br { bottom: -2px; right: -2px; border-width: 0 4px 4px 0; border-bottom-right-radius: 18px; }
 
 .scan-line {
     position: absolute; top: 10%; left: 5%; width: 90%; height: 2px;
